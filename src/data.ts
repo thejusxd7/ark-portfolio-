@@ -50,6 +50,22 @@ export const FEATURES: Feature[] = [
     iconName: "TrendingUp",
     glowColor: "teal",
     tag: "Data Insights"
+  },
+  {
+    id: "gfx-artist",
+    title: "GFX Artist",
+    description: "Designing premium visual graphics, high-impact banners, customized artwork, and exquisite digital branding assets.",
+    iconName: "Palette",
+    glowColor: "fuchsia",
+    tag: "Visual Design"
+  },
+  {
+    id: "video-editing",
+    title: "Video Editing",
+    description: "Compiling, timing, and color-grading high-definition cinematic AMVs, trailers, and promotional media exports.",
+    iconName: "Video",
+    glowColor: "cyan",
+    tag: "Motion Editing"
   }
 ];
 

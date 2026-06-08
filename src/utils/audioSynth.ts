@@ -21,36 +21,44 @@ export class AmbientSynth {
     [220.00, 261.63, 329.63, 392.00]
   ];
 
-  start() {
-    if (this.ctx) {
-      if (this.ctx.state === 'suspended') {
-        this.ctx.resume();
+  ensureContext() {
+    if (!this.ctx) {
+      try {
+        this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        
+        // Setup BGM volume node and routing so BGM is isolated from chimes
+        this.masterVolume = this.ctx.createGain();
+        this.masterVolume.gain.setValueAtTime(0.001, this.ctx.currentTime);
+        
+        const lpf = this.ctx.createBiquadFilter();
+        lpf.type = 'lowpass';
+        lpf.frequency.setValueAtTime(800, this.ctx.currentTime);
+        
+        this.masterVolume.connect(lpf);
+        lpf.connect(this.ctx.destination);
+      } catch (e) {
+        console.warn("Web Audio API is not supported in this browser context:", e);
       }
-      return;
     }
 
-    try {
-      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      // Setup master spatial delay node and gain node
-      this.masterVolume = this.ctx.createGain();
-      this.masterVolume.gain.setValueAtTime(0.001, this.ctx.currentTime);
-      
-      // Soft low-pass filter to sound very warm, cozy, lo-fi and deep retro
-      const lpf = this.ctx.createBiquadFilter();
-      lpf.type = 'lowpass';
-      lpf.frequency.setValueAtTime(800, this.ctx.currentTime); // filter out scratchy highs
-      
-      this.masterVolume.connect(lpf);
-      lpf.connect(this.ctx.destination);
-      
-      // Transition master volume in smoothly
-      this.masterVolume.gain.exponentialRampToValueAtTime(0.08, this.ctx.currentTime + 2.5);
-      
-      this.isPlaying = true;
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  start() {
+    this.ensureContext();
+    if (!this.ctx || !this.masterVolume) return;
+
+    this.isPlaying = true;
+    this.nextChordTime = 0; // reset chord scheduler timing to play immediately
+    
+    // Smoothly ramp up BGM volume
+    this.masterVolume.gain.setValueAtTime(this.masterVolume.gain.value, this.ctx.currentTime);
+    this.masterVolume.gain.exponentialRampToValueAtTime(0.08, this.ctx.currentTime + 2.0);
+
+    if (!this.timeoutId) {
       this.scheduler();
-    } catch (e) {
-      console.warn("Web Audio API is not supported in this browser context:", e);
     }
   }
 
@@ -60,17 +68,16 @@ export class AmbientSynth {
       this.masterVolume.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
     }
     
-    setTimeout(() => {
-      this.isPlaying = false;
-      if (this.timeoutId) {
-        clearTimeout(this.timeoutId);
-        this.timeoutId = null;
-      }
-    }, 600);
+    this.isPlaying = false;
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
   }
 
   playTriggerChime() {
-    if (!this.ctx || this.ctx.state === 'suspended') return;
+    this.ensureContext();
+    if (!this.ctx) return;
     
     const time = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();

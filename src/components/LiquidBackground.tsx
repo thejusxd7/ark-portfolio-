@@ -3,9 +3,10 @@ import { motion, useMotionValue, useSpring } from 'motion/react';
 
 interface LiquidBackgroundProps {
   audioActive: boolean;
+  hasEntered: boolean;
 }
 
-export default function LiquidBackground({ audioActive }: LiquidBackgroundProps) {
+export default function LiquidBackground({ audioActive, hasEntered }: LiquidBackgroundProps) {
   const [mouseActive, setMouseActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   
@@ -37,19 +38,62 @@ export default function LiquidBackground({ audioActive }: LiquidBackgroundProps)
     };
   }, [mouseX, mouseY, mouseActive]);
 
-  // Synchronize muted state of the video background with App audio state
+  // Synchronize muted state and play state of the video background with App audio state
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = !audioActive;
-      videoRef.current.volume = 0.5; // Cozy BGM level volume settings
+    if (!videoRef.current) return;
+    
+    videoRef.current.volume = 0.5; // Cozy BGM level volume settings
 
-      if (audioActive) {
-        videoRef.current.play().catch((err) => {
-          console.warn("Video sound playback requires initial user interaction:", err);
-        });
+    const attemptPlay = async () => {
+      if (!videoRef.current) return;
+
+      const targetMuted = !audioActive || !hasEntered;
+      videoRef.current.muted = targetMuted;
+
+      try {
+        await videoRef.current.play();
+      } catch (err) {
+        console.warn("First video playback attempt blocked or failed (expected on load):", err);
+        // Fallback: If unmuted autoplay fails, ALWAYS fall back to playing muted so the video starts playing immediately!
+        if (!targetMuted) {
+          try {
+            videoRef.current.muted = true;
+            await videoRef.current.play();
+            console.log("Fallback: Video playing muted to respect browser autoplay policy.");
+          } catch (fallbackErr) {
+            console.error("Fallback muted playback also failed:", fallbackErr);
+          }
+        }
       }
-    }
-  }, [audioActive]);
+    };
+
+    attemptPlay();
+  }, [audioActive, hasEntered]);
+
+  // Listen for user interaction anywhere on the document.
+  // When a user clicks, if audioActive is true and user has entered, make sure the video is unmuted and playing!
+  useEffect(() => {
+    const handleInteraction = () => {
+      if (videoRef.current && audioActive && hasEntered) {
+        if (videoRef.current.muted) {
+          videoRef.current.muted = false;
+          videoRef.current.play().catch((err) => {
+            console.warn("Could not autoplay video after user interaction:", err);
+          });
+        }
+      }
+    };
+
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
+
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+    };
+  }, [audioActive, hasEntered]);
 
   return (
     <div className="fixed inset-0 -z-50 overflow-hidden bg-slate-950 text-slate-100 select-none">

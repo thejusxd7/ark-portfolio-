@@ -19,7 +19,8 @@ import ContactSection from './components/ContactSection';
 import { AmbientSynth } from './utils/audioSynth';
 
 export default function App() {
-  const [audioActive, setAudioActive] = useState(false);
+  const [audioActive, setAudioActive] = useState(true);
+  const [hasEntered, setHasEntered] = useState(false);
   const [timeUTC, setTimeUTC] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
   const synthRef = useRef<AmbientSynth | null>(null);
@@ -44,24 +45,26 @@ export default function App() {
   const toggleBackgroundAudio = () => {
     if (!synthRef.current) return;
     
+    // Play the clicked chime feedback always
+    synthRef.current.playTriggerChime();
+
     if (audioActive) {
       synthRef.current.stop();
       setAudioActive(false);
     } else {
       synthRef.current.start();
-      synthRef.current.playTriggerChime();
       setAudioActive(true);
     }
   };
 
   const handleChimePress = () => {
-    if (synthRef.current && audioActive) {
+    if (synthRef.current) {
       synthRef.current.playTriggerChime();
     }
   };
 
   const handleShareProfile = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Avoid triggering background ambient sound
+    e.stopPropagation(); // Avoid triggering duplicate background ambient sound at page level
     const shareData = {
       title: PERSONAL_INFO.title,
       text: PERSONAL_INFO.quote,
@@ -84,7 +87,7 @@ export default function App() {
     navigator.clipboard.writeText(window.location.href);
     setShareCopied(true);
     setTimeout(() => setShareCopied(false), 2500);
-    if (synthRef.current && audioActive) {
+    if (synthRef.current) {
       synthRef.current.playTriggerChime();
     }
   };
@@ -92,7 +95,84 @@ export default function App() {
   return (
     <div id="app-root-container" className="relative min-h-screen text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-white" onClick={handleChimePress}>
       {/* Immersive Cyanic Liquid Gradient Background canvas */}
-      <LiquidBackground audioActive={audioActive} />
+      <LiquidBackground audioActive={audioActive} hasEntered={hasEntered} />
+
+      {/* Intricately designed interactive Entry Welcome Gate */}
+      <AnimatePresence>
+        {!hasEntered && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: "easeInOut" }}
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-3xl px-4 text-center cursor-pointer select-none"
+            onClick={(e) => {
+              e.stopPropagation(); // Stop bubbling to avoid playing chime twice
+              setHasEntered(true);
+              if (synthRef.current) {
+                synthRef.current.ensureContext();
+                synthRef.current.start();
+                synthRef.current.playTriggerChime();
+              }
+            }}
+          >
+            {/* Ambient background glow behind logo */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-cyan-500/10 blur-[80px] pointer-events-none animate-pulse" style={{ animationDuration: '6s' }} />
+
+            <div className="relative space-y-6 max-w-md w-full">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="flex justify-center"
+              >
+                <div className="relative group">
+                  <span className="absolute -inset-2 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 blur-lg opacity-40 group-hover:opacity-75 transition duration-1000 animate-pulse" />
+                  <img 
+                    src={PERSONAL_INFO.logo} 
+                    alt="Ark Graphics" 
+                    className="relative w-24 h-24 rounded-full border-2 border-cyan-400/60 object-cover shadow-2xl"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              </motion.div>
+
+              <div className="space-y-2">
+                <motion.h1 
+                  initial={{ y: 15, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                  className="text-4xl sm:text-5xl font-black tracking-tight text-white font-sans uppercase"
+                >
+                  {PERSONAL_INFO.title}
+                </motion.h1>
+                <motion.p 
+                  initial={{ y: 15, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.6, delay: 0.3 }}
+                  className="text-xs font-mono tracking-[0.2em] text-cyan-400 uppercase"
+                >
+                  Want to know more about me?
+                </motion.p>
+              </div>
+
+              <motion.div 
+                initial={{ y: 15, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="pt-6"
+              >
+                <button
+                  type="button"
+                  className="relative group overflow-hidden rounded-2xl px-10 py-4 bg-cyan-400 text-slate-950 font-black tracking-widest hover:bg-cyan-300 transition-all duration-300 shadow-[0_0_35px_rgba(34,211,238,0.6)] hover:shadow-[0_0_50px_rgba(34,211,238,0.95)] inline-flex items-center justify-center mx-auto cursor-pointer text-sm uppercase font-mono"
+                >
+                  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                  <span>Enter Experience</span>
+                </button>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Glassmorphic TOP HUD Dynamic Header */}
       <header className="sticky top-0 z-40 w-full border-b border-slate-900/40 bg-slate-950/25 backdrop-blur-md px-4 py-3.5 transition-all">
