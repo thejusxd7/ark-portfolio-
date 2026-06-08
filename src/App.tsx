@@ -65,10 +65,12 @@ export default function App() {
 
   const handleShareProfile = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering duplicate background ambient sound at page level
+    const shareText = "Ark Graphics, What to know more about me? , Just Experience.";
+    const shareUrl = window.location.href;
     const shareData = {
-      title: PERSONAL_INFO.title,
-      text: PERSONAL_INFO.quote,
-      url: window.location.href,
+      title: "ARK GRAPHICS",
+      text: shareText,
+      url: shareUrl,
     };
 
     if (navigator.share) {
@@ -76,15 +78,16 @@ export default function App() {
         await navigator.share(shareData);
       } catch (err) {
         console.warn("Native share cancelled or failed, falling back to copy:", err);
-        copyToClipboard();
+        copyToClipboard(shareText, shareUrl);
       }
     } else {
-      copyToClipboard();
+      copyToClipboard(shareText, shareUrl);
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(window.location.href);
+  const copyToClipboard = (text?: string, url?: string) => {
+    const copyContent = text && url ? `${text}\n${url}` : (url || window.location.href);
+    navigator.clipboard.writeText(copyContent);
     setShareCopied(true);
     setTimeout(() => setShareCopied(false), 2500);
     if (synthRef.current) {
