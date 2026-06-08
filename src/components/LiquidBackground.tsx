@@ -45,9 +45,44 @@ const resolveClientJumpshareVideo = async (): Promise<string> => {
 
 export default function LiquidBackground({ audioActive, hasEntered }: LiquidBackgroundProps) {
   const [mouseActive, setMouseActive] = useState(false);
-  const [videoSrc, setVideoSrc] = useState('/api/video');
+  const [videoSrc, setVideoSrc] = useState(() => {
+    const isStaticDeployment = typeof window !== 'undefined' && (
+      window.location.hostname.includes('vercel.app') || 
+      window.location.hostname.includes('github.io') ||
+      (!window.location.hostname.includes('run.app') && 
+       window.location.hostname !== 'localhost' && 
+       window.location.hostname !== '127.0.0.1')
+    );
+    // Initialize immediately to the stable fallback or resolved direct link if static to bypass local Express /api/video
+    return isStaticDeployment 
+      ? 'https://cdn.jumpshare.com/preview/cAOuLo9ttavbfi2UWwLxiqzfz6h9p1-GVs9xBNCPREXZwL3XicJZZ6Awf-xDPz0Uk-9N2oruCOZag38gr7p4_JMF59XQyg_rg3Ly2fsGoszxz3p0GHDm4NTnPs5kE3fzjsRJlxrEgvY4I7sqxyKMvG6yjbN-I2pg_cnoHs_AmgI.mp4' 
+      : '/api/video';
+  });
   const [hasResolvedFallback, setHasResolvedFallback] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Trigger client-side Jumpshare link parser immediately on static environments
+  useEffect(() => {
+    const checkAndResolve = async () => {
+      const isStaticDeployment = window.location.hostname.includes('vercel.app') || 
+                                 window.location.hostname.includes('github.io') ||
+                                 (!window.location.hostname.includes('run.app') && 
+                                  window.location.hostname !== 'localhost' && 
+                                  window.location.hostname !== '127.0.0.1');
+      if (isStaticDeployment && !hasResolvedFallback) {
+        setHasResolvedFallback(true);
+        try {
+          const directUrl = await resolveClientJumpshareVideo();
+          if (directUrl) {
+            setVideoSrc(directUrl);
+          }
+        } catch (err) {
+          console.error("Client side Jumpshare video resolution failed:", err);
+        }
+      }
+    };
+    checkAndResolve();
+  }, [hasResolvedFallback]);
   
   // High-fidelity spring animations for smooth organic tracking of custom cursor aura
   const mouseX = useMotionValue(0);
