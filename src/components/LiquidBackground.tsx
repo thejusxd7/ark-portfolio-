@@ -6,8 +6,47 @@ interface LiquidBackgroundProps {
   hasEntered: boolean;
 }
 
+// Highly reliable client-side Jumpshare direct MP4 URL resolver using public CORS bypass proxies
+const resolveClientJumpshareVideo = async (): Promise<string> => {
+  // Try corsproxy.io first (extremely fast direct text bypass)
+  try {
+    const response = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://jumpshare.com/v/lXQfWLFAjetJPXKb5dla'));
+    if (response.ok) {
+      const html = await response.text();
+      const match = html.match(/https:\/\/cdn\.jumpshare\.com\/preview\/[^\s"'`]+\.mp4/i);
+      if (match) {
+        console.log("Client-side video resolved via corsproxy:", match[0]);
+        return match[0];
+      }
+    }
+  } catch (err) {
+    console.warn("corsproxy.io failed, attempting allorigins...", err);
+  }
+
+  // Try allorigins.win second (robust alternative JSON-wrapped proxy)
+  try {
+    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://jumpshare.com/v/lXQfWLFAjetJPXKb5dla')}`);
+    if (response.ok) {
+      const data = await response.json();
+      const html = data.contents || '';
+      const match = html.match(/https:\/\/cdn\.jumpshare\.com\/preview\/[^\s"'`]+\.mp4/i);
+      if (match) {
+        console.log("Client-side video resolved via allorigins:", match[0]);
+        return match[0];
+      }
+    }
+  } catch (err) {
+    console.warn("allorigins fallback failed too:", err);
+  }
+
+  // Immutable, long-lasting fallback MP4 CDN link captured from stable storage
+  return 'https://cdn.jumpshare.com/preview/cAOuLo9ttavbfi2UWwLxiqzfz6h9p1-GVs9xBNCPREXZwL3XicJZZ6Awf-xDPz0Uk-9N2oruCOZag38gr7p4_JMF59XQyg_rg3Ly2fsGoszxz3p0GHDm4NTnPs5kE3fzjsRJlxrEgvY4I7sqxyKMvG6yjbN-I2pg_cnoHs_AmgI.mp4';
+};
+
 export default function LiquidBackground({ audioActive, hasEntered }: LiquidBackgroundProps) {
   const [mouseActive, setMouseActive] = useState(false);
+  const [videoSrc, setVideoSrc] = useState('/api/video');
+  const [hasResolvedFallback, setHasResolvedFallback] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   
   // High-fidelity spring animations for smooth organic tracking of custom cursor aura
@@ -68,7 +107,7 @@ export default function LiquidBackground({ audioActive, hasEntered }: LiquidBack
     };
 
     attemptPlay();
-  }, [audioActive, hasEntered]);
+  }, [audioActive, hasEntered, videoSrc]);
 
   // Listen for user interaction anywhere on the document.
   // When a user clicks, if audioActive is true and user has entered, make sure the video is unmuted and playing!
@@ -95,17 +134,26 @@ export default function LiquidBackground({ audioActive, hasEntered }: LiquidBack
     };
   }, [audioActive, hasEntered]);
 
+  const handleVideoError = async () => {
+    if (hasResolvedFallback) return;
+    setHasResolvedFallback(true);
+    console.log("Primary video endpoint /api/video failed to resolve (expected on static deployments like Vercel). Activating client-side scraper...");
+    const directUrl = await resolveClientJumpshareVideo();
+    setVideoSrc(directUrl);
+  };
+
   return (
     <div className="fixed inset-0 -z-50 overflow-hidden bg-slate-950 text-slate-100 select-none">
       {/* High-definition AMV video background */}
       <video
         ref={videoRef}
-        src="/api/video"
+        src={videoSrc}
         className="absolute inset-0 w-full h-full object-cover opacity-70 transition-opacity duration-1000"
         autoPlay
         loop
         muted
         playsInline
+        onError={handleVideoError}
       />
 
       {/* Immersive Dark Glassy Gradient Shade Overlays */}
