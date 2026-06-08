@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { motion, useMotionValue, useSpring } from 'motion/react';
 
 interface LiquidBackgroundProps {
   audioActive: boolean;
@@ -6,42 +7,36 @@ interface LiquidBackgroundProps {
 }
 
 export default function LiquidBackground({ audioActive, hasEntered }: LiquidBackgroundProps) {
+  const [mouseActive, setMouseActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const cursorRef = useRef<HTMLDivElement>(null);
+  
+  // High-fidelity spring animations for smooth organic tracking of custom cursor aura
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  
+  const springConfig = { damping: 40, stiffness: 200, mass: 0.5 };
+  const cursorX = useSpring(mouseX, springConfig);
+  const cursorY = useSpring(mouseY, springConfig);
 
-  // High-performance DOM-direct Mouse tracking with hardware-accelerating translate3d
   useEffect(() => {
-    let active = false;
-
     const handleMouseMove = (e: MouseEvent) => {
-      if (!cursorRef.current) return;
-      
-      if (!active) {
-        cursorRef.current.style.opacity = '1';
-        active = true;
-      }
-
-      const x = e.clientX - 150; // Center the 300px glow circle
-      const y = e.clientY - 150;
-      
-      cursorRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      mouseX.set(e.clientX - 150); // Offset to center the 300px glow circle
+      mouseY.set(e.clientY - 150);
+      if (!mouseActive) setMouseActive(true);
     };
 
     const handleMouseLeave = () => {
-      if (cursorRef.current) {
-        cursorRef.current.style.opacity = '0';
-        active = false;
-      }
+      setMouseActive(false);
     };
 
-    window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    document.addEventListener('mouseleave', handleMouseLeave, { passive: true });
+    window.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseleave', handleMouseLeave);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseleave', handleMouseLeave);
     };
-  }, []);
+  }, [mouseX, mouseY, mouseActive]);
 
   // Synchronize muted state and play state of the video background with App audio state
   useEffect(() => {
@@ -89,9 +84,9 @@ export default function LiquidBackground({ audioActive, hasEntered }: LiquidBack
       }
     };
 
-    window.addEventListener('click', handleInteraction, { passive: true });
-    window.addEventListener('touchstart', handleInteraction, { passive: true });
-    window.addEventListener('keydown', handleInteraction, { passive: true });
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
 
     return () => {
       window.removeEventListener('click', handleInteraction);
@@ -128,21 +123,49 @@ export default function LiquidBackground({ audioActive, hasEntered }: LiquidBack
         className="absolute inset-0 opacity-[0.02] bg-[linear-gradient(135deg,#3b82f6_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none"
       />
 
-      {/* Dynamic Floating Liquid Blobs (Liquid cyanic blue energy) using hardware-driven CSS animation */}
+      {/* Dynamic Floating Liquid Blobs (Liquid cyanic blue energy) */}
       <div className="absolute inset-0 overflow-hidden filter blur-[120px] opacity-40 pointer-events-none">
         {/* Blob 1 - Cyan Core */}
-        <div className="absolute -top-10 left-1/4 w-[450px] h-[450px] rounded-full bg-cyan-600/20 mix-blend-screen animate-blob-1" />
+        <motion.div
+          animate={{
+            x: [100, 300, -50, 100],
+            y: [-50, 150, 200, -50],
+            scale: [1, 1.3, 0.9, 1],
+          }}
+          transition={{
+            duration: 25,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute -top-10 left-1/4 w-[450px] h-[450px] rounded-full bg-cyan-600/20 mix-blend-screen"
+        />
 
         {/* Blob 2 - Sapphire Blue Deep Wave */}
-        <div className="absolute top-1/3 right-1/4 w-[500px] h-[500px] rounded-full bg-blue-600/15 mix-blend-screen animate-blob-2" />
+        <motion.div
+          animate={{
+            x: [200, -100, 150, 200],
+            y: [300, 50, -100, 300],
+            scale: [1.2, 0.8, 1.1, 1.2],
+          }}
+          transition={{
+            duration: 30,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute top-1/3 right-1/4 w-[500px] h-[500px] rounded-full bg-blue-600/15 mix-blend-screen"
+        />
       </div>
 
       {/* Mouse Tracking Interaction Aura (Liquid Light Follower) */}
-      <div
-        ref={cursorRef}
-        className="pointer-events-none fixed z-30 w-[300px] h-[300px] rounded-full bg-cyan-400/10 opacity-0 filter blur-[60px] mix-blend-screen cursor-aura"
-        style={{ left: 0, top: 0 }}
-      />
+      {mouseActive && (
+        <motion.div
+          className="pointer-events-none fixed z-30 w-[300px] h-[300px] rounded-full bg-cyan-400/10 opacity-50 filter blur-[60px] mix-blend-screen"
+          style={{
+            x: cursorX,
+            y: cursorY,
+          }}
+        />
+      )}
 
       {/* Interactive Scanline Retro Filter (Subtle cyberpunk texture overlay) */}
       <div className="absolute inset-0 pointer-events-none opacity-[0.015] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[size:100%_4px,3px_100%]" />
