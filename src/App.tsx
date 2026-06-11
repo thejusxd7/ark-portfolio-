@@ -3,8 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Volume2, 
   VolumeX, 
-  Clock, 
-  Compass, 
   ArrowDownRight, 
   Crown,
   Share2,
@@ -21,7 +19,6 @@ import { AmbientSynth } from './utils/audioSynth';
 export default function App() {
   const [audioActive, setAudioActive] = useState(true);
   const [hasEntered, setHasEntered] = useState(false);
-  const [timeUTC, setTimeUTC] = useState('');
   const [shareCopied, setShareCopied] = useState(false);
   const synthRef = useRef<AmbientSynth | null>(null);
 
@@ -29,18 +26,6 @@ export default function App() {
   if (!synthRef.current) {
     synthRef.current = new AmbientSynth();
   }
-
-  // Update clock timers
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimeUTC(now.toUTCString().replace('GMT', 'UTC'));
-    };
-    
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const toggleBackgroundAudio = () => {
     if (!synthRef.current) return;
@@ -200,23 +185,11 @@ export default function App() {
             </div>
           </div>
 
-          {/* Active Navigation Sections Tracker & Stats Indicator */}
-          <div className="hidden md:flex items-center gap-6 text-xs text-slate-400 font-mono">
-            <div className="flex items-center gap-1.5 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-900">
-              <Compass size={12} className="text-cyan-400 animate-spin-slow" />
-              <span className="text-slate-300">AESTHETIC PORTFOLIO</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock size={12} className="text-cyan-500" />
-              <span className="tracking-wide text-[10px] text-slate-300 select-all">{timeUTC}</span>
-            </div>
-          </div>
-
           {/* Optional Ambient Audio Interface Controls */}
           <div className="flex items-center gap-3">
             {/* Real-time responsive visualizer loops showing if playing */}
             {audioActive && (
-              <div className="hidden xs:flex items-end gap-[2px] h-3.5 px-1">
+              <div className="hidden xs:flex items-end gap-[2px] h-3.5 px-1 mr-1">
                 {[...Array(6)].map((_, i) => (
                   <motion.div 
                     key={i}
@@ -239,14 +212,13 @@ export default function App() {
                 e.stopPropagation();
                 toggleBackgroundAudio();
               }}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-mono transition-all duration-300 cursor-pointer ${
+              className={`flex items-center justify-center p-2.5 rounded-full border transition-all duration-300 cursor-pointer ${
                 audioActive 
                   ? 'bg-cyan-500/20 border-cyan-400/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.15)]' 
                   : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
               }`}
             >
-              {audioActive ? <Volume2 size={13} /> : <VolumeX size={13} />}
-              <span className="hidden sm:inline">AMBIENT SCENE SOUNDS</span>
+              {audioActive ? <Volume2 size={16} /> : <VolumeX size={16} />}
             </button>
           </div>
 
