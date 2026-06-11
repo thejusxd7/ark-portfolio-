@@ -6,83 +6,9 @@ interface LiquidBackgroundProps {
   hasEntered: boolean;
 }
 
-// Highly reliable client-side Jumpshare direct MP4 URL resolver using public CORS bypass proxies
-const resolveClientJumpshareVideo = async (): Promise<string> => {
-  // Try corsproxy.io first (extremely fast direct text bypass)
-  try {
-    const response = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://jumpshare.com/v/lXQfWLFAjetJPXKb5dla'));
-    if (response.ok) {
-      const html = await response.text();
-      const match = html.match(/https:\/\/cdn\.jumpshare\.com\/preview\/[^\s"'`]+\.mp4/i);
-      if (match) {
-        console.log("Client-side video resolved via corsproxy:", match[0]);
-        return match[0];
-      }
-    }
-  } catch (err) {
-    console.warn("corsproxy.io failed, attempting allorigins...", err);
-  }
-
-  // Try allorigins.win second (robust alternative JSON-wrapped proxy)
-  try {
-    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://jumpshare.com/v/lXQfWLFAjetJPXKb5dla')}`);
-    if (response.ok) {
-      const data = await response.json();
-      const html = data.contents || '';
-      const match = html.match(/https:\/\/cdn\.jumpshare\.com\/preview\/[^\s"'`]+\.mp4/i);
-      if (match) {
-        console.log("Client-side video resolved via allorigins:", match[0]);
-        return match[0];
-      }
-    }
-  } catch (err) {
-    console.warn("allorigins fallback failed too:", err);
-  }
-
-  // Immutable, long-lasting fallback MP4 CDN link captured from stable storage
-  return 'https://cdn.jumpshare.com/preview/cAOuLo9ttavbfi2UWwLxiqzfz6h9p1-GVs9xBNCPREXZwL3XicJZZ6Awf-xDPz0Uk-9N2oruCOZag38gr7p4_JMF59XQyg_rg3Ly2fsGoszxz3p0GHDm4NTnPs5kE3fzjsRJlxrEgvY4I7sqxyKMvG6yjbN-I2pg_cnoHs_AmgI.mp4';
-};
-
 export default function LiquidBackground({ audioActive, hasEntered }: LiquidBackgroundProps) {
   const [mouseActive, setMouseActive] = useState(false);
-  const [videoSrc, setVideoSrc] = useState(() => {
-    const isStaticDeployment = typeof window !== 'undefined' && (
-      window.location.hostname.includes('vercel.app') || 
-      window.location.hostname.includes('github.io') ||
-      (!window.location.hostname.includes('run.app') && 
-       window.location.hostname !== 'localhost' && 
-       window.location.hostname !== '127.0.0.1')
-    );
-    // Initialize immediately to the stable fallback or resolved direct link if static to bypass local Express /api/video
-    return isStaticDeployment 
-      ? 'https://cdn.jumpshare.com/preview/cAOuLo9ttavbfi2UWwLxiqzfz6h9p1-GVs9xBNCPREXZwL3XicJZZ6Awf-xDPz0Uk-9N2oruCOZag38gr7p4_JMF59XQyg_rg3Ly2fsGoszxz3p0GHDm4NTnPs5kE3fzjsRJlxrEgvY4I7sqxyKMvG6yjbN-I2pg_cnoHs_AmgI.mp4' 
-      : '/api/video';
-  });
-  const [hasResolvedFallback, setHasResolvedFallback] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Trigger client-side Jumpshare link parser immediately on static environments
-  useEffect(() => {
-    const checkAndResolve = async () => {
-      const isStaticDeployment = window.location.hostname.includes('vercel.app') || 
-                                 window.location.hostname.includes('github.io') ||
-                                 (!window.location.hostname.includes('run.app') && 
-                                  window.location.hostname !== 'localhost' && 
-                                  window.location.hostname !== '127.0.0.1');
-      if (isStaticDeployment && !hasResolvedFallback) {
-        setHasResolvedFallback(true);
-        try {
-          const directUrl = await resolveClientJumpshareVideo();
-          if (directUrl) {
-            setVideoSrc(directUrl);
-          }
-        } catch (err) {
-          console.error("Client side Jumpshare video resolution failed:", err);
-        }
-      }
-    };
-    checkAndResolve();
-  }, [hasResolvedFallback]);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   
   // High-fidelity spring animations for smooth organic tracking of custom cursor aura
   const mouseX = useMotionValue(0);
@@ -91,6 +17,57 @@ export default function LiquidBackground({ audioActive, hasEntered }: LiquidBack
   const springConfig = { damping: 40, stiffness: 200, mass: 0.5 };
   const cursorX = useSpring(mouseX, springConfig);
   const cursorY = useSpring(mouseY, springConfig);
+
+  // Send communication commands to Vimeo API via postMessage
+  const sendVimeoCommand = (method: string, value?: any) => {
+    if (iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ method, value }),
+          '*'
+        );
+      } catch (e) {
+        console.warn("Failed to communicate with Vimeo player iframe:", e);
+      }
+    }
+  };
+
+  // Synchronize muted state and volume of Vimeo with App state
+  const syncVolumeState = () => {
+    const isMuted = !audioActive || !hasEntered;
+    if (isMuted) {
+      sendVimeoCommand('setVolume', 0);
+      sendVimeoCommand('mute');
+    } else {
+      sendVimeoCommand('setVolume', 0.9); // Full high-fidelity volume for the epic edit soundtrack
+      sendVimeoCommand('unmute');
+      sendVimeoCommand('play'); // Kick off playing immediately upon entering site
+    }
+  };
+
+  // Synchronize when state changes
+  useEffect(() => {
+    syncVolumeState();
+  }, [audioActive, hasEntered]);
+
+  // Hook into browser custom interactions to ensure Chrome volume policies accept the audio start
+  useEffect(() => {
+    const handleInteraction = () => {
+      if (audioActive && hasEntered) {
+        syncVolumeState();
+      }
+    };
+
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
+
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+    };
+  }, [audioActive, hasEntered]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -112,84 +89,34 @@ export default function LiquidBackground({ audioActive, hasEntered }: LiquidBack
     };
   }, [mouseX, mouseY, mouseActive]);
 
-  // Synchronize muted state and play state of the video background with App audio state
-  useEffect(() => {
-    if (!videoRef.current) return;
-    
-    videoRef.current.volume = 0.5; // Cozy BGM level volume settings
-
-    const attemptPlay = async () => {
-      if (!videoRef.current) return;
-
-      const targetMuted = !audioActive || !hasEntered;
-      videoRef.current.muted = targetMuted;
-
-      try {
-        await videoRef.current.play();
-      } catch (err) {
-        console.warn("First video playback attempt blocked or failed (expected on load):", err);
-        // Fallback: If unmuted autoplay fails, ALWAYS fall back to playing muted so the video starts playing immediately!
-        if (!targetMuted) {
-          try {
-            videoRef.current.muted = true;
-            await videoRef.current.play();
-            console.log("Fallback: Video playing muted to respect browser autoplay policy.");
-          } catch (fallbackErr) {
-            console.error("Fallback muted playback also failed:", fallbackErr);
-          }
-        }
-      }
-    };
-
-    attemptPlay();
-  }, [audioActive, hasEntered, videoSrc]);
-
-  // Listen for user interaction anywhere on the document.
-  // When a user clicks, if audioActive is true and user has entered, make sure the video is unmuted and playing!
-  useEffect(() => {
-    const handleInteraction = () => {
-      if (videoRef.current && audioActive && hasEntered) {
-        if (videoRef.current.muted) {
-          videoRef.current.muted = false;
-          videoRef.current.play().catch((err) => {
-            console.warn("Could not autoplay video after user interaction:", err);
-          });
-        }
-      }
-    };
-
-    window.addEventListener('click', handleInteraction);
-    window.addEventListener('touchstart', handleInteraction);
-    window.addEventListener('keydown', handleInteraction);
-
-    return () => {
-      window.removeEventListener('click', handleInteraction);
-      window.removeEventListener('touchstart', handleInteraction);
-      window.removeEventListener('keydown', handleInteraction);
-    };
-  }, [audioActive, hasEntered]);
-
-  const handleVideoError = async () => {
-    if (hasResolvedFallback) return;
-    setHasResolvedFallback(true);
-    console.log("Primary video endpoint /api/video failed to resolve (expected on static deployments like Vercel). Activating client-side scraper...");
-    const directUrl = await resolveClientJumpshareVideo();
-    setVideoSrc(directUrl);
-  };
-
   return (
     <div className="fixed inset-0 -z-50 overflow-hidden bg-slate-950 text-slate-100 select-none">
-      {/* High-definition AMV video background */}
-      <video
-        ref={videoRef}
-        src={videoSrc}
-        className="absolute inset-0 w-full h-full object-cover opacity-70 transition-opacity duration-1000"
-        autoPlay
-        loop
-        muted
-        playsInline
-        onError={handleVideoError}
-      />
+      {/* Immersive Responsive Vimeo Video Background styled to perfectly cover viewport */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none opacity-70">
+        <iframe
+          ref={iframeRef}
+          src="https://player.vimeo.com/video/1200422232?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1&muted=1&controls=0&title=0&byline=0&portrait=0&playsinline=1&api=1"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: '100vw',
+            height: '56.25vw', /* 16:9 ratio */
+            minWidth: '177.77vh', /* 16:9 ratio to fill screen */
+            minHeight: '100vh',
+            transform: 'translate(-50%, -50%)',
+            border: 'none',
+            pointerEvents: 'none',
+          }}
+          allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+          title="ARK GRAPHICS BG"
+          referrerPolicy="strict-origin-when-cross-origin"
+          onLoad={() => {
+            // Apply initial muted/unmuted state immediately as soon as Vimeo loads
+            syncVolumeState();
+          }}
+        />
+      </div>
 
       {/* Immersive Dark Glassy Gradient Shade Overlays */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-950/60 via-transparent to-slate-950/90 pointer-events-none" />

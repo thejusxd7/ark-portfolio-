@@ -4,11 +4,7 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/api/video",
-      "destination": "/api/video"
-    },
-    {
-      "source": "/((?!assets/|api/|favicon.ico).*)",
+      "source": "/((?!assets/|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]
